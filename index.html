@@ -221,7 +221,7 @@ const SMALL = innerWidth < 760;
 /* Settings: graphics quality, reduced motion, sound. Saved on this device only. */
 const CFG = Object.assign({ q: SMALL || (navigator.hardwareConcurrency || 8) <= 4 ? 'medium' : 'high', rm: RM, snd: false, vol: .5, bh: 'realism' }, (() => { try { return JSON.parse(localStorage.getItem('space3d-cfg')) || {}; } catch (e) { return {}; } })());
 CFG.snd = false; RM = CFG.rm; document.documentElement.classList.toggle('rm', RM);
-const QS = { low: { px: 1, tex: 256, st: .3, fx: 0 }, medium: { px: 1.5, tex: 512, st: .7, fx: 1 }, high: { px: 2, tex: 768, st: 1.4, fx: 2 } };
+const QS = { low: { px: 1, tex: 192, st: .3, fx: 0 }, medium: { px: 1.5, tex: 320, st: .7, fx: 1 }, high: { px: 2, tex: 512, st: 1.4, fx: 2 } };
 const SND = {};
 function sound() { /* quiet ambient hum, only ever started from a click */
   if (CFG.snd) {
@@ -237,7 +237,7 @@ function sound() { /* quiet ambient hum, only ever started from a click */
 /* ---------- procedural noise ---------- */
 const lerp = (a, b, t) => a + (b - a) * t;
 const cl01 = v => Math.max(0, Math.min(1, v));
-const hash = (x, y, z) => { const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return n - Math.floor(n); };
+const hash = (x, y, z) => { let n = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 1274126177); n = Math.imul(n ^ (n >>> 13), 1103515245); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
 function vnoise(x, y, z) {
   const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), f = v => v * v * (3 - 2 * v);
   const u = f(x - xi), v = f(y - yi), w = f(z - zi), c = (a, b, d) => hash(xi + a, yi + b, zi + d);
@@ -324,7 +324,7 @@ function Scene({ api, onFail, onReady }) {
       const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, 1, .1, 200);
       cam.position.set(0, 0, RM ? 6 : 7.4);
 
-      const hw = SMALL || CFG.q === 'low' ? 512 : CFG.q === 'high' ? 1024 : 768, T = makeMaps(hw, hw / 2);
+      const hw = SMALL || CFG.q === 'low' ? 384 : CFG.q === 'high' ? 768 : 512, T = makeMaps(hw, hw / 2);
       const planet = new THREE.Mesh(new THREE.SphereGeometry(1.5, 72, 72), new THREE.MeshStandardMaterial({ map: T.map, bumpMap: T.bump, bumpScale: 2.2, roughnessMap: T.rough, roughness: 1, metalness: 0 }));
       const clouds = new THREE.Mesh(new THREE.SphereGeometry(1.525, 72, 72), new THREE.MeshStandardMaterial({ map: T.cloud, transparent: true, depthWrite: false, roughness: 1, opacity: .92 }));
       const halo = new THREE.Mesh(new THREE.SphereGeometry(1.72, 48, 48), atm(0x4a8cff, THREE.BackSide, 'pow(smoothstep(0.,.5,d),2.6)*lit*.95'));
@@ -447,8 +447,8 @@ function Sections({ setSel, go }) {
 }
 
 const crater = (x, y, z) => { /* cellular noise: dark crater basins */
-  const X = x * 7, Y = y * 7, Z = z * 7, i = Math.floor(X), j = Math.floor(Y), k = Math.floor(Z); let m = 9;
-  for (let a = -1; a < 2; a++) for (let b = -1; b < 2; b++) for (let c = -1; c < 2; c++) { const I = i + a, J = j + b, K = k + c, d = Math.hypot(X - I - hash(I, J, K), Y - J - hash(I + 5, J, K), Z - K - hash(I, J + 9, K)); if (d < m) m = d; }
+  const X = x * 7, Y = y * 7, Z = z * 7, i = Math.floor(X - .5), j = Math.floor(Y - .5), k = Math.floor(Z - .5); let m = 9;
+  for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) { const I = i + a, J = j + b, K = k + c, d = Math.hypot(X - I - hash(I, J, K), Y - J - hash(I + 5, J, K), Z - K - hash(I, J + 9, K)); if (d < m) m = d; }
   return .62 + .38 * cl01((m - .1) * 4.5);
 };
 /* ---------- STAGE 1: interactive solar system ---------- */
@@ -660,7 +660,8 @@ function UniverseSection() {
 function UniverseMap() {
   const box = useRef(), cv = useRef(), api = useRef({}), [state, setState] = useState('loading'), [sel, setSel] = useState(-1), [mode, setMode] = useState('map'), [prog, setProg] = useState(0), [world, setWorld] = useState(null), [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem('space3d-worlds') || '[]'); } catch (e) { return []; } });
   useEffect(() => {
-    let cleanup; const boot = setTimeout(() => { try { cleanup = build(); setState('on'); } catch (e) { setState('fail'); } }, 200);
+    let cleanup, boot;
+    const lazy = new IntersectionObserver(([en]) => { if (en.isIntersecting) { lazy.disconnect(); if (!box.current) return; boot = setTimeout(() => { try { cleanup = build(); setState('on'); } catch (e) { setState('fail'); } }, 50); } }, { rootMargin: '300px' }); lazy.observe(box.current);
     function build() {
       const canvas = cv.current, TAU = 6.2832, Q = QS[CFG.q] || QS.medium, cr = v => Math.max(2.5, Math.min(170, v));
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
@@ -822,7 +823,8 @@ function SolarSystem() {
   const box = useRef(), cv = useRef(), api = useRef({}), [state, setState] = useState('loading'), [sel, setSel] = useState(-1), [playing, setPlaying] = useState(!RM), [si, setSi] = useState(2);
   api.current.playing = playing; api.current.speed = SPEEDS[si];
   useEffect(() => {
-    let cleanup; const boot = setTimeout(() => { try { cleanup = build(); setState('on'); } catch (e) { setState('fail'); } }, 150);
+    let cleanup, boot; /* build lazily, only when this section is near the screen, so the page never freezes at load */
+    const lazy = new IntersectionObserver(([en]) => { if (en.isIntersecting) { lazy.disconnect(); if (!box.current) return; boot = setTimeout(() => { try { cleanup = build(); setState('on'); } catch (e) { setState('fail'); } }, 50); } }, { rootMargin: '300px' }); lazy.observe(box.current);
     function build() {
       let minR = 8; const canvas = cv.current, TAU = 6.2832, cr = v => Math.max(minR, Math.min(140, v));
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: !SMALL, alpha: true });

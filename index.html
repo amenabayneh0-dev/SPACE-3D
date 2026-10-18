@@ -201,6 +201,9 @@ button:disabled{opacity:.5;cursor:default}
 .pan>.btn{width:100%;margin-bottom:10px}
 @media (max-width:1100px){.burger{display:flex}.links{position:fixed;inset:0;z-index:1;flex-direction:column;align-items:center;justify-content:center;gap:26px;background:rgba(2,3,10,.96);opacity:0;visibility:hidden;transition:opacity .4s,visibility .4s}.links.open{opacity:1;visibility:visible}.links a{font-size:1rem;letter-spacing:.3em}}
 .pan .cav a{color:var(--cyan)}
+.soc{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;margin-top:64px;font-size:.68rem;letter-spacing:.24em;color:var(--mute)}
+.soc a{display:inline-flex;align-items:center;min-height:44px;padding:0 22px;font:600 .68rem var(--body);letter-spacing:.22em;color:var(--ink);text-decoration:none;border:1px solid rgba(141,155,196,.4);border-radius:2px;background:rgba(7,13,36,.5);transition:border-color .3s,background .3s,box-shadow .3s}
+.soc a:hover{border-color:var(--cyan);background:rgba(53,224,255,.1);box-shadow:0 0 22px rgba(53,224,255,.25)}
 </style>
 </head>
 <body>
@@ -435,7 +438,10 @@ function Sections({ setSel, go }) {
       h('div', { className: 'grid' }, P.map((p, i) => h(Card, { key: p.n, p, i, onOpen: setSel })))),
     h('section', { id: 'about', className: 'sec end' },
       h('h2', { className: 'st big rv' }, 'THE UNIVERSE IS WAITING.'),
-      h('div', { className: 'rv', style: d(.2) }, h(Btn, { cls: 'pri', onClick: go('top') }, 'EXPLORE AGAIN'))));
+      h('div', { className: 'rv', style: d(.2) }, h(Btn, { cls: 'pri', onClick: go('top') }, 'EXPLORE AGAIN')),
+      h('div', { className: 'rv soc', style: d(.3) }, h('span', null, 'FOLLOW @XAUSOLUS'),
+        h('a', { href: 'https://www.instagram.com/xausolus', target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Instagram, @xausolus (opens in a new tab)' }, 'INSTAGRAM'),
+        h('a', { href: 'https://t.me/xausolus', target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Telegram, @xausolus (opens in a new tab)' }, 'TELEGRAM'))));
 }
 
 const crater = (x, y, z) => { /* cellular noise: dark crater basins */

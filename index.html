@@ -204,6 +204,8 @@ button:disabled{opacity:.5;cursor:default}
 .soc{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;margin-top:64px;font-size:.68rem;letter-spacing:.24em;color:var(--mute)}
 .soc a{display:inline-flex;align-items:center;min-height:44px;padding:0 22px;font:600 .68rem var(--body);letter-spacing:.22em;color:var(--ink);text-decoration:none;border:1px solid rgba(141,155,196,.4);border-radius:2px;background:rgba(7,13,36,.5);transition:border-color .3s,background .3s,box-shadow .3s}
 .soc a:hover{border-color:var(--cyan);background:rgba(53,224,255,.1);box-shadow:0 0 22px rgba(53,224,255,.25)}
+.wc{display:grid;grid-template-columns:1fr 1fr;gap:8px}.wc>.btn,.wc .cav{grid-column:1/-1;margin:0}
+.ms .sum{grid-column:1/-1;font-style:normal;font-size:.76rem;line-height:1.5;color:var(--cyan)}
 </style>
 </head>
 <body>
@@ -524,12 +526,12 @@ const col = (hu, s, l) => new THREE.Color().setHSL(((hu % 360) + 360) % 360 / 36
 function newWorld() {
   const r = Math.random, hu = r() * 360;
   return { name: pick(['Ky', 'Vel', 'Or', 'Zan', 'Tha', 'Mir', 'Eld', 'Cae', 'Nov', 'Ryx']) + pick(['ara', 'ion', 'eth', 'os', 'una', 'ex', 'ine', 'ora']) + '-' + (100 + Math.floor(r() * 900)),
-    sc: 1.2 + r() * 2.6, sea: .3 + r() * .3, lo: rgb(col(hu, .5, .28)), hi: rgb(col(hu + 40 + r() * 80, .45, .62)), water: rgb(col(hu + 180, .6, .22)), atm: col(hu + 150 + r() * 80, .8, .6), ring: r() < .4, moons: Math.floor(r() * 4) };
+    sc: 1.2 + r() * 2.6, sea: .3 + r() * .3, lo: rgb(col(hu, .5, .28)), hi: rgb(col(hu + 40 + r() * 80, .45, .62)), water: rgb(col(hu + 180, .6, .22)), atm: col(hu + 150 + r() * 80, .8, .6), ring: r() < .4, moons: Math.floor(r() * 4), clouds: r() < .6, rough: 1, light: 0 };
 }
 const describe = w => 'A fictional ' + (w.sea > .5 ? 'ocean-covered' : w.sea > .4 ? 'land-and-sea' : 'rugged, mostly dry') + ' world' + (w.ring ? ' with a ring system' : '') + ', ' + (w.moons ? w.moons + (w.moons === 1 ? ' moon' : ' moons') : 'no moons') + '. Invented for this app, not a real discovery.';
 const worldFn = w => (x, y, z) => {
   if (Math.abs(y) > .88) return [235, 240, 248];
-  const ht = fbm(x * w.sc + 3, y * w.sc, z * w.sc, 5);
+  const s = w.sc * [.6, 1, 1.6][w.rough == null ? 1 : w.rough]; const ht = fbm(x * s + 3, y * s, z * s, 5);
   return ht < w.sea ? mix(w.water, [w.water[0] * 2, w.water[1] * 2.2, w.water[2] * 2.2], ht / w.sea) : mix(w.lo, w.hi, cl01((ht - w.sea) * 3));
 };
 /* Black hole shader: per-pixel light bending (Schwarzschild null-geodesic approximation, units of rs), thin disk, Doppler beaming, gravitational redshift */
@@ -629,12 +631,21 @@ void main(){
   float alpha = hole ? 1. : max(max(col.r, max(col.g, col.b)), 1. - tr);
   gl_FragColor = vec4(col, alpha) * (1. - smoothstep(18., 24., bimp));
 }`;
+/* Missions with badges and discovery summaries; saved alien worlds */
+const MISSIONS2 = [
+  ['Visit all eight planets', () => PL.filter(p => VIS.has('p:' + p.n)).length, 8, 'Grand Tour', 'Rocky inner worlds, gas giants and ice giants each formed differently. You have now seen all eight.'],
+  ['Explore a nebula', () => +VIS.has('d:nebula'), 1, 'Stellar Nursery', 'Nebulae are clouds of gas and dust. Gravity can pull dense regions together until new stars ignite.'],
+  ['Discover a black hole', () => +VIS.has('d:blackhole'), 1, 'Event Horizon', 'Light cannot escape a black hole. Its dark shadow looks larger than the horizon because gravity bends light.'],
+  ['Visit a distant galaxy', () => +VIS.has('d:galaxy'), 1, 'Deep Field', 'Galaxies hold billions of stars plus gas, dust and dark matter. Spiral arms are where many new stars form.'],
+  ['Create an alien planet', () => +VIS.has('c:world'), 1, 'World Builder', 'Your world is fictional. Real exoplanets are found indirectly, and what they look like is mostly unknown.']
+];
+const saveWorld = w => { try { const L = JSON.parse(localStorage.getItem('space3d-worlds') || '[]'); L.unshift({ name: w.name, sc: w.sc, sea: w.sea, lo: w.lo, hi: w.hi, water: w.water, atm: w.atm.getHexString(), ring: w.ring, moons: w.moons, clouds: w.clouds, rough: w.rough, light: w.light }); const out = L.slice(0, 12); localStorage.setItem('space3d-worlds', JSON.stringify(out)); return out; } catch (e) { return null; } };
 function Missions({ onClose }) {
   const [, bump] = useState(0); useEffect(() => { const f = () => bump(n => n + 1); addEventListener('space3d-visit', f); return () => removeEventListener('space3d-visit', f); }, []);
-  const rows = MISSIONS.map(([t, f, n]) => [t, Math.min(f(), n), n]), pct = Math.round(rows.reduce((s, r) => s + r[1] / r[2], 0) / rows.length * 100);
+  const rows = MISSIONS2.map(([t, f, n, bd, sm]) => [t, Math.min(f(), n), n, bd, sm]), pct = Math.round(rows.reduce((s, r) => s + r[1] / r[2], 0) / rows.length * 100);
   return h('div', { className: 'modal', onClick: onClose }, h('div', { className: 'panel set', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Missions', onClick: e => e.stopPropagation() },
     h('h3', null, 'MISSIONS'), h('p', null, 'Exploration ' + pct + '% complete'),
-    rows.map(([t, v, n], i) => h('div', { key: t, className: 'ms' }, h('span', null, (v >= n ? '\u2713 ' : '') + 'Mission ' + (i + 1) + ': ' + t), h('small', null, v + ' / ' + n), h('i', { style: { '--w': v / n * 100 + '%' } }))),
+    rows.map(([t, v, n, bd, sm], i) => h('div', { key: t, className: 'ms' }, h('span', null, (v >= n ? '\u2713 ' : '') + 'Mission ' + (i + 1) + ': ' + t), h('small', null, v + ' / ' + n), h('i', { style: { '--w': v / n * 100 + '%' } }), v >= n && h('em', { className: 'sum' }, '\u2605 BADGE: ' + bd.toUpperCase() + '. ' + sm))),
     h('p', { className: 'cav' }, 'Progress is saved on this device. Select planets in the Solar System Explorer and visit destinations in Universe Mode.'),
     h('button', { className: 'btn sec', onClick: () => { VIS.clear(); try { localStorage.removeItem('space3d-visits'); } catch (e) {} dispatchEvent(new Event('space3d-visit')); } }, h('span', null, 'RESET PROGRESS')),
     h('button', { className: 'skip', onClick: onClose }, 'CLOSE')));
@@ -647,7 +658,7 @@ function UniverseSection() {
     h('div', { className: 'rv', style: { '--d': '.2s' } }, h(UniverseMap, { key: q })));
 }
 function UniverseMap() {
-  const box = useRef(), cv = useRef(), api = useRef({}), [state, setState] = useState('loading'), [sel, setSel] = useState(-1), [mode, setMode] = useState('map'), [prog, setProg] = useState(0), [world, setWorld] = useState(null);
+  const box = useRef(), cv = useRef(), api = useRef({}), [state, setState] = useState('loading'), [sel, setSel] = useState(-1), [mode, setMode] = useState('map'), [prog, setProg] = useState(0), [world, setWorld] = useState(null), [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem('space3d-worlds') || '[]'); } catch (e) { return []; } });
   useEffect(() => {
     let cleanup; const boot = setTimeout(() => { try { cleanup = build(); setState('on'); } catch (e) { setState('fail'); } }, 200);
     function build() {
@@ -682,7 +693,8 @@ function UniverseMap() {
           W.atm = new THREE.Mesh(new THREE.SphereGeometry(1.95, 32, 32), atm(0x55ddff, THREE.BackSide, 'pow(smoothstep(0.,.5,d),2.6)*lit*.95'));
           W.ring = new THREE.Mesh(ringGeo(2.3, 3.8), new THREE.MeshStandardMaterial({ map: ringTex(), transparent: true, side: THREE.DoubleSide, roughness: 1, depthWrite: false })); W.ring.rotation.x = Math.PI / 2 - .3;
           W.moons = [0, 1, 2].map(i => { const m = new THREE.Mesh(new THREE.SphereGeometry(.14 + i * .04, 16, 16), new THREE.MeshStandardMaterial({ color: 0xaab0c4, roughness: 1 })); m.userData = { d: 3 + i * .9, s: .5 + i * .2 }; g.add(m); return m; });
-          g.add(W.mesh, W.atm, W.ring);
+          W.cloud = new THREE.Mesh(new THREE.SphereGeometry(1.64, 48, 48), new THREE.MeshStandardMaterial({ map: stex(Q.tex, (x, y, z) => { const c = cl01((fbm(x * 2.4 + 9, y * 3, z * 2.4, 5) - .48) * 3.2) * 255; return [c, c, c]; }), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, roughness: 1, opacity: .85 }));
+          g.add(W.mesh, W.atm, W.ring, W.cloud);
         }
       };
       mk.blackhole = g => {
@@ -695,7 +707,7 @@ function UniverseMap() {
       let cur = newWorld();
       const setW = (w, retex) => {
         if (retex) { const t = stex(Q.tex, worldFn(w)); W.mesh.material.map && W.mesh.material.map.dispose(); W.mesh.material.map = t; W.mesh.material.needsUpdate = true; W.atm.material.uniforms.col.value.set(w.atm); }
-        W.ring.visible = w.ring; W.moons.forEach((m, i) => m.visible = i < w.moons); setWorld({ name: w.name, desc: describe(w), ring: w.ring, moons: w.moons });
+        W.ring.visible = w.ring; W.cloud.visible = !!w.clouds; dl.position.set(...[[-30, 20, 40], [30, 10, 40], [0, -30, 40]][w.light || 0]); W.moons.forEach((m, i) => m.visible = i < w.moons); setWorld({ name: w.name, desc: describe(w), ring: w.ring, moons: w.moons, clouds: w.clouds, rough: w.rough, light: w.light || 0 });
       };
       setW(cur, true);
       /* streaks live in camera space and only appear during travel */
@@ -709,7 +721,20 @@ function UniverseMap() {
       api.current.select = sel; api.current.map = () => sel(-1); api.current.view = e => { idle = false; tph = Math.min(2.9, Math.max(.25, Math.PI / 2 - e * Math.PI / 180)); }; api.current.cancel = () => { if (md === 'travel') sel(sl); };
       api.current.zoom = f => { idle = false; trad = cr(trad * f); };
       api.current.travel = () => { if (sl < 0 || md === 'travel') return; md = 'travel'; tt = 0; lastP = -1; ttgt.set(...DEST[sl].pos); trad = DEST[sl].er; tph = DEST[sl].id === 'blackhole' ? 1.42 : 1.3; if (!RM) tth += .9; idle = false; hl.visible = false; setMode('travel'); setProg(0); };
-      api.current.world = k => { if (k === 'new') cur = newWorld(); else if (k === 'ring') cur.ring = !cur.ring; else cur.moons = (cur.moons + 1) % 4; setW(cur, k === 'new'); };
+      api.current.world = k => {
+        let re = false;
+        if (typeof k === 'object') { cur = { ...k, atm: new THREE.Color('#' + k.atm) }; re = true; }
+        else if (k === 'new') { cur = newWorld(); re = true; visit('c:world'); }
+        else if (k === 'ring') cur.ring = !cur.ring;
+        else if (k === 'moons') cur.moons = (cur.moons + 1) % 4;
+        else if (k === 'clouds') cur.clouds = !cur.clouds;
+        else if (k === 'terrain') { cur.rough = ((cur.rough == null ? 1 : cur.rough) + 1) % 3; re = true; }
+        else if (k === 'light') cur.light = ((cur.light || 0) + 1) % 3;
+        else if (k === 'recolor') { const n = newWorld(); Object.assign(cur, { lo: n.lo, hi: n.hi, water: n.water, atm: n.atm }); re = true; visit('c:world'); }
+        else if (k === 'save') { const L = saveWorld(cur); if (L) setSaved(L); visit('c:world'); }
+        setW(cur, re);
+      };
+      api.current.skip = () => { if (md === 'travel') tt = dur; };
       const pick = e => { const r = canvas.getBoundingClientRect(); ptr.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ptr, cam); const hh = ray.intersectObjects(hits); if (hh.length) sel(hits.indexOf(hh[0].object)); };
       const down = e => { if (md === 'travel') return; canvas.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); idle = false; if (pts.size === 1) { d0 = [e.clientX, e.clientY]; moved = false; } else moved = true; };
       const move = e => { const p0 = pts.get(e.pointerId); if (!p0) return; if (Math.hypot(e.clientX - d0[0], e.clientY - d0[1]) > 6) moved = true;
@@ -729,6 +754,7 @@ function UniverseMap() {
         if (A.bh) { A.bh.lookAt(cam.position); A.bh.material.uniforms.uT.value = t; }
         th += (tth - th) * .06; ph += (tph - ph) * .06; rad += (trad - rad) * .06; tgt.lerp(ttgt, .06);
         cam.position.set(tgt.x + rad * Math.sin(ph) * Math.sin(th), tgt.y + rad * Math.cos(ph), tgt.z + rad * Math.sin(ph) * Math.cos(th)); cam.lookAt(tgt);
+        const fv = 50 + I * 22; if (cam.fov !== fv) { cam.fov = fv; cam.updateProjectionMatrix(); }
         streaks.visible = I > .02; if (streaks.visible) { sx.forEach((s, k) => { s[2] += dt * (30 + I * 90); if (s[2] > -1) s[2] = -50; const L = 1 + I * 12; sp.set([s[0], s[1], s[2], s[0], s[1], s[2] - L], k * 6); }); streaks.geometry.attributes.position.needsUpdate = true; streaks.material.opacity = I * .8; }
         renderer.render(scene, cam);
       };
@@ -745,16 +771,18 @@ function UniverseMap() {
       state !== 'on' && h('div', { className: 'msg' }, state === 'fail' ? 'Your browser could not start 3D graphics.' : 'MAPPING THE UNIVERSE'),
       h('div', { className: 'tl' }, 'UNIVERSE MODE', h('b', null, mode === 'travel' ? 'IN TRANSIT' : D ? D.n : 'UNIVERSE MAP')),
       h('div', { className: 'hint' }, 'Drag to rotate \u00b7 Scroll or pinch to zoom \u00b7 Tap a destination'),
-      mode === 'travel' && D && h('div', { className: 'trav', role: 'status' }, h('b', null, 'TRAVELING TO ' + D.n), h('i', { style: { '--w': prog + '%' } }), h('span', null, prog + '%'), h('button', { className: 'btn sec', onClick: () => api.current.cancel() }, h('span', null, 'CANCEL TRAVEL'))),
+      mode === 'travel' && D && h('div', { className: 'trav', role: 'status' }, h('b', null, 'TRAVELING TO ' + D.n), h('i', { style: { '--w': prog + '%' } }), h('span', null, prog + '%'), h('button', { className: 'btn sec', onClick: () => api.current.cancel() }, h('span', null, 'CANCEL TRAVEL')), h('button', { className: 'skip', onClick: () => api.current.skip() }, 'SKIP ANIMATION')),
       h('div', { className: 'ctl' }, btn('+', 'Zoom in', .8), btn('\u2212', 'Zoom out', 1.25))),
     D && mode !== 'travel' && h('aside', { className: 'pan', 'aria-live': 'polite' },
       h('span', { className: 'badge' }, D.tag), h('h3', null, alien && world ? world.name.toUpperCase() : D.n),
       h('p', { className: 'bl' }, alien && world ? world.desc : D.desc),
       h('dl', null, D.facts.flatMap(([k, v]) => [h('dt', { key: k }, k), h('dd', { key: k + 'v' }, v)])),
       D.src && h('p', { className: 'cav' }, 'Inspired by NASA visualizations, not a copy of them. References: ', D.src.map(([l, u], i) => h('a', { key: u, href: u, target: '_blank', rel: 'noopener noreferrer' }, l + (i < D.src.length - 1 ? ', ' : '')))),
-      mode === 'map' ? h('button', { className: 'btn pri', onClick: () => api.current.travel() }, h('span', null, 'EXPLORE DESTINATION')) : [
+      mode === 'map' ? h('button', { className: 'btn pri', onClick: () => api.current.travel() }, h('span', null, 'ENGAGE WARP')) : [
         D.id === 'blackhole' && h('div', { key: 'bv', className: 'wc' }, h('span', { className: 'cav' }, 'VIEW ANGLE'), [['EDGE-ON', 4], ['OBLIQUE', 25], ['FROM ABOVE', 75]].map(([l, e]) => h('button', { key: l, className: 'more', onClick: () => api.current.view(e) }, l))),
-        alien && h('div', { key: 'w', className: 'wc' }, h('button', { className: 'btn pri', onClick: () => api.current.world('new') }, h('span', null, 'GENERATE NEW WORLD')), h('button', { className: 'more', onClick: () => api.current.world('ring') }, 'RINGS: ' + (world && world.ring ? 'ON' : 'OFF')), h('button', { className: 'more', onClick: () => api.current.world('moons') }, 'MOONS: ' + (world ? world.moons : 0))),
+        alien && h('div', { key: 'w', className: 'wc' }, h('button', { className: 'btn pri', onClick: () => api.current.world('new') }, h('span', null, 'GENERATE NEW WORLD')), h('button', { className: 'more', onClick: () => api.current.world('ring') }, 'RINGS: ' + (world && world.ring ? 'ON' : 'OFF')), h('button', { className: 'more', onClick: () => api.current.world('moons') }, 'MOONS: ' + (world ? world.moons : 0)),
+          [['clouds', 'CLOUDS: ' + (world && world.clouds ? 'ON' : 'OFF')], ['terrain', 'TERRAIN: ' + ['SMOOTH', 'NORMAL', 'RUGGED'][world && world.rough != null ? world.rough : 1]], ['light', 'LIGHT: ' + (world ? world.light + 1 : 1)], ['recolor', 'RECOLOR'], ['save', 'SAVE WORLD']].map(([k, l]) => h('button', { key: k, className: 'more', onClick: () => api.current.world(k) }, l)),
+          saved.slice(0, 3).map((s, i) => h('button', { key: 's' + i, className: 'more', onClick: () => api.current.world(s) }, 'LOAD ' + s.name))),
         h('button', { key: 'm', className: 'btn sec', onClick: () => api.current.map() }, h('span', null, 'RETURN TO UNIVERSE MAP')),
         h('button', { key: 's', className: 'btn sec', onClick: toSolar }, h('span', null, 'RETURN TO SOLAR SYSTEM'))]),
     h('div', { className: 'sel' }, h('div', { className: 'chips' }, DEST.map((d, k) => h('button', { key: d.id, className: 'chip' + (k === sel ? ' on' : ''), 'aria-pressed': k === sel, disabled: state !== 'on' || mode === 'travel', onClick: () => api.current.select(k) }, h(Sphere, { p: d, s: 34 }), h('span', null, h('b', null, d.n), d.tag))))),
